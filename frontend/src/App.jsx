@@ -368,7 +368,7 @@ function App() {
     formData.append('jd', jd);
 
     try {
-      const response = await fetch("http://localhost:8000/analyze", {
+      const response = await fetch("https://skill-gap-ai-il3w.onrender.com/analyze", {
         method: "POST",
         body: formData
       });
