@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, RefreshCw, Download, FileText, CheckCircle2, ChevronRight, GraduationCap } from 'lucide-react';
-import BackgroundEffects from './components/BackgroundEffects';
+// import BackgroundEffects from './components/BackgroundEffects';
 import FileUpload from './components/FileUpload';
 import SkillGaps from './components/SkillGaps';
 import BarChartComponent from './components/BarChart';
@@ -10,6 +10,7 @@ import RoapMap from './components/RoapMap';
 import ExecutiveSummary from './components/ExecutiveSummary';
 
 function App() {
+  const [showUpload, setshowUpload] = useState(false)
   const [resumeFile, setResumeFile] = useState(null);
   const [jdFile, setJdFile] = useState(null);
   const [screen, setScreen] = useState('upload'); // 'upload' | 'results'
@@ -20,6 +21,18 @@ function App() {
   const [scores, setScores] = useState(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const uploadRef = useRef(null);
+
+  const handleGetStarted = () => {
+    setshowUpload(true);
+
+    setTimeout(() => {
+      uploadRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 200);
+  };
 
   const handleMouseMove = (e) => {
     const { clientX, clientY } = e;
@@ -32,10 +45,10 @@ function App() {
   const getMockData = (resName, jdName) => {
     const defaultRes = resName ? resName.name : "Resume.pdf";
     const defaultJd = jdName ? jdName.name : "Senior_Frontend_Developer.pdf";
-    
+
     // Customization based on file name strings
     const isBackend = defaultJd.toLowerCase().includes('backend') || defaultJd.toLowerCase().includes('python') || defaultJd.toLowerCase().includes('go');
-    
+
     return {
       gaps: {
         candidate_experience: "2.5 Years (Mid-level Developer)",
@@ -148,18 +161,18 @@ function App() {
         const itemLower = item.toLowerCase();
         const hasFullMatch = candidateSet.includes(itemLower);
         if (hasFullMatch) return { name: item, status: 'matched' };
-        
+
         // Check for partial substring overlaps
         const hasPartialMatch = candidateSet.some(cand => cand.includes(itemLower) || itemLower.includes(cand));
         if (hasPartialMatch) return { name: item, status: 'partial' };
-        
+
         return { name: item, status: 'missing' };
       });
     };
 
     // Extract candidates
     const candidateTech = rawGaps.candidate_skills?.technical_skills?.map(s => s.toLowerCase()) || [];
-    
+
     const transformedGaps = {
       candidate_experience: rawGaps.candidate_experience || "Not Provided",
       required_experience: rawGaps.required_experience || "Not Provided",
@@ -201,60 +214,60 @@ function App() {
   // Parses raw LLM Markdown roadmap text into custom stateful structures dynamically
   const parseMarkdownRoadmap = (markdownText) => {
     if (!markdownText) return getMockData(resumeFile, jdFile).roadmap;
-    
+
     try {
       const weeks = [];
       const sections = markdownText.split(/Week\s*(\d+)/gi);
-      
+
       let weekIndex = 1;
       for (let i = 1; i < sections.length; i += 2) {
         const weekNum = sections[i];
         const weekContent = sections[i + 1] || "";
-        
+
         // Extract title
         const titleMatch = weekContent.match(/^\s*[:\-]*\s*([^\n]+)/);
         const title = titleMatch ? `Week ${weekNum}: ${titleMatch[1].trim()}` : `Week ${weekNum}: Skill Growth`;
-        
+
         // Extract objective
         const objMatch = weekContent.match(/(?:objective|goal|focus):\s*([^\n]+)/i);
         const objective = objMatch ? objMatch[1].trim() : "Focus on mastering core skills and bridging technical limitations.";
-        
+
         // Extract bullet tasks line-by-line (highly robust table and prefix parser!)
         const tasks = [];
         const lines = weekContent.split('\n');
         let taskCount = 0;
-        
+
         for (let line of lines) {
           line = line.trim();
           if (!line) continue;
-          
+
           // Ignore objective lines or week titles
           if (line.toLowerCase().includes("objective") || line.toLowerCase().includes("week") || line.toLowerCase().includes("goal:")) continue;
-          
+
           // Handle Markdown Table Rows
           if (line.startsWith('|')) {
             // Skip dividers (e.g., |---|---|)
             if (line.includes('---') || line.includes(':---')) continue;
-            
+
             // Skip headers
             const lowerLine = line.toLowerCase();
             if (lowerLine.includes('topic') || lowerLine.includes('duration') || lowerLine.includes('resource') || lowerLine.includes('focus')) continue;
-            
+
             // Clean table row
             let taskText = line
               .replace(/^\|\s*/, '') // Remove starting pipe
               .replace(/\|\s*$/, '') // Remove ending pipe
               .trim();
-              
+
             // Strip leading list digits from cell (e.g., "7) |")
             taskText = taskText.replace(/^\d+[\s\.)\-]+\s*\|\s*/, '').trim();
-            
+
             // Clean markdown links (supports spaces in URL)
             let humanReadableText = taskText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
-            
+
             // Format remaining column boundaries to readable dividers
             humanReadableText = humanReadableText.replace(/\s*\|\s*/g, ' | ').trim();
-            
+
             if (humanReadableText.length >= 3) {
               tasks.push({
                 id: `api_w${weekNum}_t${taskCount}`,
@@ -266,24 +279,24 @@ function App() {
             }
             continue;
           }
-          
+
           // Handle Standard Bullet List Items
           const bulletRegex = /^(?:-\s*\[\s*[xX\s]?\s*\]|-\s*|\*\s*|\d+[\s\.)\-]+\s*)(.*)$/;
           const match = line.match(bulletRegex);
-          
+
           if (match) {
             let taskText = match[1].trim();
-            
+
             // Skip dividers or residues
             if (taskText.startsWith('|') || taskText.replace(/[\-\|:\s]/g, '') === '') continue;
             if (taskText.length < 3) continue;
-            
+
             // Clean markdown links (supports spaces in URL)
             let humanReadableText = taskText.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
-            
+
             // Remove trailing pipes
             humanReadableText = humanReadableText.replace(/\|\s*$/, '').trim();
-            
+
             if (humanReadableText.length >= 3) {
               tasks.push({
                 id: `api_w${weekNum}_t${taskCount}`,
@@ -374,7 +387,7 @@ function App() {
       });
 
       if (!response.ok) throw new Error("Backend unavailable");
-      
+
       setLoadingStatus("Structuring results...");
       const data = await response.json();
       handleResults(data);
@@ -382,7 +395,7 @@ function App() {
       console.warn("FastAPI backend connection refused. Launching intelligent Hackathon Mock Mode.", err);
       setLoadingStatus("FastAPI server offline. Activating dynamic local mock systems...");
       await new Promise(r => setTimeout(r, 1500));
-      
+
       const mock = getMockData(resume, jd);
       setGaps(mock.gaps);
       setScores(mock.scores);
@@ -409,12 +422,12 @@ function App() {
   };
 
   return (
-    <div 
+    <div
       onMouseMove={handleMouseMove}
       className="relative min-h-screen overflow-x-hidden w-full font-sans selection:bg-indigo-500/30 text-slate-100 flex flex-col items-center"
     >
-      {/* Background Ambience */}
-      <BackgroundEffects mousePos={mousePos} />
+      {/* Background Ambience
+      <BackgroundEffects mousePos={mousePos} /> */}
 
       {/* Top Header Sticky Navigation */}
       <header className="sticky top-0 z-40 w-full glass-panel border-b border-white/5 backdrop-blur-md">
@@ -458,9 +471,8 @@ function App() {
                 Demo Mode:
                 <button
                   onClick={() => setIsDemoMode(!isDemoMode)}
-                  className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
-                    isDemoMode ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-400'
-                  }`}
+                  className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${isDemoMode ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-400'
+                    }`}
                 >
                   {isDemoMode ? 'ON' : 'OFF'}
                 </button>
@@ -472,6 +484,16 @@ function App() {
 
       {/* Main Container Views with Page Transitions */}
       <main className="w-full max-w-7xl px-6 md:px-12 lg:px-16 py-12 md:py-20 flex-1 flex flex-col justify-center">
+        {/* Background Image */}
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-45"
+          style={{
+            backgroundImage: "url('/bg.png')"
+          }}
+        />
+
+        {/* Dark Overlay */}
+        <div className="absolute inset-0 bg-black/60" />
         <AnimatePresence mode="wait">
           {screen === 'upload' ? (
             <motion.div
@@ -484,6 +506,9 @@ function App() {
             >
               {/* Hero Header Section */}
               <div className="relative text-center max-w-2xl mx-auto mb-16 md:mb-20">
+
+
+
                 {/* Left Floating Stat Card Wrapper for Mouse Parallax */}
                 <motion.div
                   animate={{
@@ -496,9 +521,9 @@ function App() {
                   {/* Left Floating Stat Card for Elegant Float */}
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
-                    animate={{ 
-                      opacity: 1, 
-                      scale: 1, 
+                    animate={{
+                      opacity: 1,
+                      scale: 1,
                       rotate: -5,
                       y: [0, -6, 0]
                     }}
@@ -507,10 +532,10 @@ function App() {
                       scale: { duration: 0.5, delay: 0.3 },
                       y: { duration: 8, repeat: Infinity, ease: "easeInOut" }
                     }}
-                    whileHover={{ 
-                      scale: 1.04, 
-                      rotate: -3, 
-                      boxShadow: "0 0 25px rgba(244,63,94,0.2)" 
+                    whileHover={{
+                      scale: 1.04,
+                      rotate: -3,
+                      boxShadow: "0 0 25px rgba(244,63,94,0.2)"
                     }}
                     className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl glass-panel border border-pink-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.4),0_0_15px_rgba(244,63,94,0.08)] backdrop-blur-2xl transition-all duration-300"
                   >
@@ -531,9 +556,9 @@ function App() {
                   {/* Right Floating Stat Card for Elegant Float */}
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8, rotate: 5 }}
-                    animate={{ 
-                      opacity: 1, 
-                      scale: 1, 
+                    animate={{
+                      opacity: 1,
+                      scale: 1,
                       rotate: 5,
                       y: [0, 6, 0]
                     }}
@@ -542,10 +567,10 @@ function App() {
                       scale: { duration: 0.5, delay: 0.4 },
                       y: { duration: 9, repeat: Infinity, ease: "easeInOut", delay: 0.5 }
                     }}
-                    whileHover={{ 
-                      scale: 1.04, 
-                      rotate: 3, 
-                      boxShadow: "0 0 25px rgba(6,182,212,0.2)" 
+                    whileHover={{
+                      scale: 1.04,
+                      rotate: 3,
+                      boxShadow: "0 0 25px rgba(6,182,212,0.2)"
                     }}
                     className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl glass-panel border border-cyan-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.4),0_0_15px_rgba(6,182,212,0.08)] backdrop-blur-2xl transition-all duration-300"
                   >
@@ -554,7 +579,9 @@ function App() {
                   </motion.div>
                 </motion.div>
 
-                <motion.div 
+
+
+                <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.15 }}
@@ -567,7 +594,7 @@ function App() {
                     </span>
                   </div>
                 </motion.div>
-                
+
                 <h1 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl tracking-tight text-white mb-6 leading-[1.12]">
                   Discover Your{' '}
                   <span className="relative inline-block">
@@ -584,8 +611,40 @@ function App() {
                 </p>
               </div>
 
+
+              <div className='flex justify-center mb-8'>
+                <button
+                  onClick={handleGetStarted}
+                  // onClick={handleSubmit}
+                  // disabled={!resume || !jd || isLoading}
+                  className={`group relative flex items-center gap-2.5 px-10 py-4.5 rounded-2xl text-sm font-bold tracking-wider transition-all duration-500 overflow-hidden cursor-pointer`}
+                >
+
+                  <>
+                    {/* Static / Default state background */}
+                    <span className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 transition-opacity duration-500 group-hover:opacity-0" />
+                    {/* Animated hover gradient sweep background */}
+                    <span className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 bg-[length:200%_auto] opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-text-shine" />
+                    {/* High intensity glowing ambient neon ring behind button on hover */}
+                    <span className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-cyan-400 to-purple-500 blur-xl opacity-0 group-hover:opacity-60 -z-10 transition-all duration-500 group-hover:scale-105" />
+                  </>
+
+                  <span className="relative z-10 flex items-center gap-2 select-none">
+                    Get Started
+                  </span>
+                </button>
+              </div>
+
               {/* Upload Workspace */}
-              <FileUpload onAnalyze={runAnalysis} isLoading={isLoading} demoActive={isDemoMode} />
+              {showUpload && (
+                <div className="flex justify-center mt-16 mb-24" ref={uploadRef}>
+                  <FileUpload
+                    onAnalyze={runAnalysis}
+                    isLoading={isLoading}
+                    demoActive={isDemoMode}
+                  />
+                </div>
+              )}
             </motion.div>
           ) : (
             <motion.div
@@ -601,11 +660,11 @@ function App() {
 
               {/* Row 2: Overview Grid (3 columns: Compatibility, Target Proficiency, Competency Matrix) */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
+
                 {/* Column 1: Match Compatibility */}
                 <div className="glass-panel rounded-3xl p-6 flex flex-col items-center justify-between text-center relative overflow-hidden h-[360px] border border-white/5 hover:border-white/10 transition-all duration-300">
                   <div className="absolute top-0 right-0 w-[120px] h-[120px] bg-indigo-500/5 blur-[40px] rounded-full -z-10" />
-                  
+
                   <div>
                     <h3 className="font-display text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">MATCH COMPATIBILITY</h3>
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Match score relative to job title</p>
@@ -636,7 +695,7 @@ function App() {
                         strokeLinecap="round"
                       />
                     </svg>
-                    
+
                     <div className="absolute flex flex-col items-center justify-center">
                       <span className="font-display text-4xl font-extrabold text-white">
                         {scores?.overall}%
@@ -655,7 +714,7 @@ function App() {
                         Mid to Senior
                       </span>
                     </div>
-                    
+
                     <div className="text-left space-y-1.5 bg-white/[0.02] border border-white/5 rounded-xl px-3.5 py-2 text-[10px]">
                       <div className="flex justify-between">
                         <span className="text-slate-400 font-semibold">Your Profile:</span>
@@ -708,7 +767,7 @@ function App() {
 
               {/* Row 3: Deep-Dive Competency Alignments (Radar Chart & Skill Badges Details side-by-side) */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-                
+
                 {/* Competency Alignment Radar Card */}
                 <div className="lg:col-span-7 glass-panel rounded-3xl p-6 md:p-8 flex flex-col justify-between hover:shadow-[0_8px_30px_rgb(99,102,241,0.06)] border border-white/10 transition-all duration-300">
                   <div>
@@ -781,7 +840,7 @@ function App() {
               <Sparkles className="w-8 h-8 text-indigo-400 animate-pulse" />
             </div>
 
-            <motion.h3 
+            <motion.h3
               animate={{ opacity: [0.6, 1, 0.6] }}
               transition={{ duration: 1.5, repeat: Infinity }}
               className="font-display text-2xl font-bold text-white mb-2"
